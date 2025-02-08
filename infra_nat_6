@@ -1,0 +1,494 @@
+Présentation générale du projet
+
+• Contexte L’entreprise souhaite refaire son infrastructure existante dans le but de la sécuriser en respectant les normes et bonnes pratiques.
+
+Dans ce cadre, l’entreprise nous consulte pour proposer une infrastructure informatique respectant les bonnes pratiques.
+
+Périmètre Notre périmètre inclus la restructuration de l’infrastructure physique et virtuelle locale de l’entreprise dans le but de la sécuriser et la volonté d’internaliser le site web vitrine de l’entreprise.
+Analyse de l’existant
+
+Schéma physique actuel
+y a un schéma
+
+• Schéma logique actuel
+y a un schéma
+
+Recommandations techniques
+Hyperviseurs
+Les serveurs physiques seront dans un cluster de haute disponibilité. Pour cela, un espace de stockage partagé sur le réseau sera utilisé pour faire la bascule des machines virtuelles entre les hyperviseurs. De plus, la fonction de répartition de charge sera activée afin de soulager les hyperviseurs et de ne pas avoir des hyperviseurs inactifs la plupart du temps.
+2
+
+Active Directory et RODC
+L’active directory est un service annuaire qui inventorie et gère un ensemble d’objets que sont les comptes et groupes utilisateurs d’une organisation, mais également les serveurs, les postes de travail, les imprimantes, les domaines, les stratégies de sécurité, etc. Il a notamment vocation à permettre aux utilisateurs de trouver et d’accéder aux ressources connues de l’annuaire en fournissant des mécanismes d’identification, d’authentification et d’autorisation.
+Dans cette infrastructure nous avons préféré mettre en place deux active directories pour assurer déjà la redondance dans le système afin que le second puisse prendre le relai en cas d’incapacité par le premier ou alors en cas de problème. Il est important de préciser que ces ADs seront dans leur propre vlan pour garantir plus de sécurité et limiter l’accès. Dans ces ADs, nous avons créés des utilisateurs, groupes et ensuite des unités organisationnelles pour se conformer aux préconisations de l’ANSSI, qui nous conseil d’utiliser le modèle ADGLP pour assurer l’attribution des privilèges aux utilisateurs et groupes.
+L’attribution des privilèges des administrateurs a été divisée en 03 tiers en respect des bonnes pratiques de l’ANSSI. En fonction des administrateurs et de la criticité des privilèges, nous avons repartis les tiers en tiers 0, tiers 1 et tiers 2.
+Toujours dans le respect des bonnes pratiques, après avoir attribué des privilèges aux utilisateurs, des audits de permission ont été conduites pour identifier et supprimer des permissions excessives et inutiles. Dans cette même lancée, des outils d’audits ont été mis en place pour assurer des audits réguliers afin de surveiller régulièrement les membres des groupes et des suppressions.
+Dans l’optique d’assurer une haute disponibilité et la sécurité, nous avons aussi mis en place des RODC (Read Only Domain Controler), qui seront aussi dans leur propre vlan. Avoir deux RODC permet de gérer les cas de panne d’un des serveurs, garantissant que les utilisateurs locaux peuvent toujours s’authentifier et accéder aux ressources sans dépendre du site principal et ce qui nous permet aussi d’éviter les risques de perte d’accès.
+Il est important de savoir aussi que la mise en place des RODCs est aussi nécessaire pour éviter la modification non autorisée de l’AD via sa fonction read only.
+En cas de besoin, les administrateurs pourront passer par un vlan dédié pour joindre le domaine effectuer des modifications si nécessaire.
+Il y aura un annuaire pour les utilisateurs et les comptes administrateurs et un autre pour les administrateurs et utilisateurs Renater.
+3
+
+Migration des serveurs
+• Contrôleur de domaine
+Passage vers la dernière version stable de l’OS pour bénéficier du support et des mises à jour de sécurité.
+Serveur de fichiers
+Des serveurs permettant de faire du partage de fichiers sur le réseau. Il y aura de la redondance et une liaison de réplication entre les serveurs pour que les données soient exactes sur l’ensemble du cluster.
+Pour la gestion des accès, l’utilisation de la méthode AGDPL sera effectuée. Des GPO seront déployés pour connecter chaque partage réseau sur les postes des utilisateurs.
+Nous mettrons en place selon les préconisations de l’ANSSI une journalisation sur les fichiers (accès, modification, suppression).
+Ces serveurs seront sauvegardés et des tests de restaurations seront effectués tous les mois. Il y aura également des copies instantanées en plus (Shadow Copy).
+Certains dossiers présentent une criticité supérieure à d’autres (données sensibles). C’est pourquoi notre mise en place d’une méthode AGDLP permettra de contrôler plus facilement les accès aux utilisateurs. En effet, il ne faut pas seulement distinguer administrateurs et utilisateurs mais également prendre en compte les profils et groupes de la société. Ce filtrage permettra un meilleur contrôle mais également un meilleur suivi.
+Clustering pare-feu Nord-Sud / Est-Ouest
+Mise en place d’un cluster en mode actif-passif visant à garantir la haute disponibilité du pare-feu. Un pare-feu est actif gérant tout le trafic, tandis que le second est en passif et prêt à prendre le relais automatiquement en cas de panne.
+Redondance WAN
+La redondance WAN avec 2 fournisseurs d’accès à Internet (FAI) pour assurer la disponibilité continue de la connectivité Internet. Deux liens WAN des FAI sont connectés au routeur, puis reliés au pare feu. Le routeur joue le rôle de passerelles WAN pour. Si un lien tombe, le firewall bascule le trafic vers l’autre lien. Le firewall agit comme passerelle par défaut pour VLANs internes.
+Restructuration du réseau
+4
+5 • Segmentation en VLAN
+Voici la segmentation proposée pour les VLANs :
+DMZ : Zone démilitarisée hébergeant les services exposés à Internet et servant d’interface entre le réseau interne et externe
+Wifi_Public : Réseau sans fil destiné aux visiteurs avec accès Internet restreint
+Administration : Réseau réservé aux administrateurs système pour la gestion de l’infrastructure
+Management : VLAN de gestion pour les équipements réseau (switches, routeurs, pare-feu)
+Active Directory : Réseau hébergeant les contrôleurs de domaine principaux et les services d’annuaire
+RODC : VLAN dédié aux contrôleurs de domaine en lecture seule
+Sauvegarde : Réseau isolé pour les serveurs de sauvegarde
+Broker RDS : VLAN pour les serveurs de connexion Remote Desktop Services
+RDS : Réseau hébergeant les serveurs de sessions Remote Desktop Services
+Téléphonie : VLAN dédié à la téléphonie IP et aux communications unifiées
+Repository : Réseau contenant les systèmes de sauvegarde
+WEB : VLAN hébergeant le serveur web de l’entreprise
+IT : Réseau dédié aux outils de monitoring, SIEM, et ITAM
+File Server : VLAN pour les serveurs de fichiers et le stockage partagé
+Wifi_Privé : Réseau sans fil sécurisé pour les employés de l’entreprise
+SMTP : LAN dédié aux relais SMTP
+Lan utilisateur : Réseau utilisateurs regroupant les postes de travail
+Impression : LAN dédié aux imprimantes et serveurs d’impression
+Bastion : Zone sécurisée servant de point d’accès unique pour l’administration
+PrestaX : VLAN isolé dédié aux services du prestataire X
+PrestaY : VLAN isolé dédié aux services du prestataire Y
+CAS : VLAN dédié au serveur d’authentification pour RENATER et Compilation
+• Mise en place d’une plage d’adresse IP privée
+En se conformant à la RFC 1918, nous choisirons une plage d’adresse IP de classe C donc 192.168.0.0/16.
+5
+Aménagement d’une salle B
+Une autre salle sera aménagée sur le site et se situera à 340m de la salle A. Celle-ci disposera de protection physique (accès par badge, vidéosurveillance et journalisation des accès). De plus, cette salle aura également des protections pour diminuer la propagation d’un incendie.
+Sécurisation des accès
+• Virtual Private Network
+Afin de sécuriser les différents liens entre notre SI et l’extérieur, il est nécessaire d’établir une connexion VPN IPsec avec nos prestataires hébergeant nos données. Nous avons choisi d’héberger une copie de nos sauvegardes (serveurs et utilisateurs), ainsi que notre serveur de supervision chez l’hébergeur. Tout d’abord, nous définissons les flux à sécuriser :
+— Flux entre l’espace de stockage local et l’espace de stockage de l’hébergeur (NAS local vers NAS cloud), pour le transfert de données de sauvegarde des serveurs, données utilisateurs etc…
+— Flux « monitoring » entre le VLAN Supervision et le serveur de supervision
+La création d’un lien VPN IPsec va donc nécessiter de sécuriser ces flux et les ports qu’ils utilisent. De plus, il faudra aussi respecter les préconisations suivantes :
+Selon la charte des prestataires, « Les échanges doivent être protégés de bout en bout par des fonctions de chiffrement et d’authentification mutuelle ; ces fonctions étant de préférence conformes au Référentiel Général de Sécurité (RGS) ; Un dispositif de filtrage doit autoriser uniquement les flux nécessaires à l’intervention à distance. Ce dispositif peut être à base de filtrage d’adresse IP ou de liste blanche de certificat par exemple ».
+D’après l’ANSSI, Les mécanismes cryptographiques utilisés pour la protection en intégrité ou en confidentialité sont paramétrés par une ou plusieurs clés. Le protocole IKE va permettre l’authentification des deux extrémités d’un tunnel sécurisé en échangeant des clés partagées
+L’entreprise devra définir une plage d’adresses IP privées pour les ressources hébergées (exemple 172.16.0.0/16). L’adresse IP publique fournie par l’hébergeur sera utilisée pour établir le lien VPN vers notre DMZ publique.
+Lors de l’établissement du tunnel IPsec, il faudra veiller à respecter les normes indiquées dans le RFC 4301 « Security Architecture for Internet Protocol ».
+La connexion des prestataires devra être basée sur une connexion SAML sécurisée via un compte prestataire géré depuis l’Active Directory. À cette connexion s’ajoute l’authentification multi-facteur déjà mise en place pour les employés. La configuration du VPN nomade devra être réalisée en ayant pour objectif que les connexions inactives depuis plus de trente minutes soient automatiquement déconnectées, afin de limiter le le trafic inutile, et le risque d’intrusion
+Equipement mobile nomade
+Afin d’administrer facilement la flotte de téléphones portables de l’entreprise, il est impératif de 6 disposer d’un logiciel de gestion des téléphones, autrement dit “Mobile Device Management” (MDM). Cet outil permettra la désactivation à distance des mobiles en cas de perte ou de vol, l’installation à distance d’application ainsi que le contrôle sur les applications disponibles, et bien d’autres fonctionnalités qui vont permettre la gestion technique et financière de la flotte mobile. L’application MDM est implémentée sur un serveur dédié dans un réseau dédié. D’après l’ANSSI, les téléphones d’entreprises doivent bénéficier des dernières MAJ logicielle, et dans le cas où un appareil serait inactif depuis plusieurs mois, il ne pourrait pas bénéficier des MAJ, il faut donc pouvoir mettre en quarantaine les appareils qui présentent un risque, ce qui est possible avec un MDM. Toujours d’après l’ANSSI, il est aussi important d’assurer la sécurité physique des appareils en mettant des moyens à disposition pour protéger les équipements. Enfin, pour respecter les recommandations, il faut également un équipement à un utilisateur unique.
+RDS et Application publiée
+Mise en place d’une ferme RDS pour répondre aux besoins en connexion simultanées de l’entreprise. La ferme RDS sera configuré de manière à être conforme à la haute disponibilité pour répondre aux exigences du PCA/PRA.
+De plus l’application métier hébergée sur un serveur sera publiée sur le serveur RDS de manière qu’elle soit accessible à tous les utilisateurs en fonction de leur profil et de leurs rôles AGDLP.
+Renforcement du Wifi
+Les bornes wifi diffusant les SSID seront liées à un contrôleur Wi-Fi pour faciliter l’administration, le contrôleur Wi-Fi aura une patte dans le VLAN Management.
+Cette structure (bornes Wi-Fi et contrôleur) aura son image micrologiciel régulièrement mis à jour lorsqu’elle est disponible.
+Les configurations seront sauvegardées à chaque modification dans un espace de stockage dédié créé sur le NAS.
+• Wi-Fi entreprise avec authentification renforcée
+Déploiement d’un SSID dédié pour les internes à l’entreprise, dans un VLAN dédié. L’authentification des utilisateurs se fera avec du WPA-Enterprise en utilisant le serveur de contrôleur de domaine. Le choix du nom du SSID ne sera pas explicite (n’est pas liée à un nom d’activité professionnelle par exemple).
+• Réseau invité
+Déploiement d’un SSID dédié pour les visiteurs, celui-ci sera dans un VLAN dédié. Il y aura une authentification avec un mot de passe robuste avec une rotation tous les 6 mois et l’utilisateur arrivera sur un portail captif pour renseigner le nom, prénom et l’adresse mail de la personne qui se connecte. Cela évite que des personnes pouvant capter le réseau invité de faire des actions malveillantes dessus 7 en l’utilisant. Ces informations seront ensuite conservées pendant 1 an avec l’historique de navigation. Il n’y aura pas de flux autorisé pour ce VLAN vers les autres VLAN du réseau interne, ils ne pourront que sortir sur Internet. Ils ne pourront pas voir les autres utilisateurs connectés dans ce même réseau (Isolation du client).
+Solution de sauvegarde
+Le serveur de sauvegarde sera physique pour limiter les pertes en cas de compromission/indisponibilité de l’ensemble du SI.
+La solution de sauvegarde respecte la stratégie 3.2.1.1.0. 3 sauvegardes seront effectuées avec une présence à 2 supports différents dont 1 sur un support dématérialisé et 1 sur un support physique différents. Le 0 correspond au test des sauvegardes mensuelle qui serviront à vérifier l’intégrité des données. Des procédures seront mises en place pour tester le bon fonctionnement de récupération de données à partir des sauvegardes.
+Une sauvegarde incrémentielle sera faite tous les jours et une sauvegarde totale sera faite par semaine.
+La politique de rétention est décidée pour supprimer les sauvegardes incrémentales chaque semaine.
+La sauvegarde totale hebdomadaire sera supprimée au bout de 2 semaines. La dernière sauvegarde hebdomadaire de chaque fin de mois sera conservée pendant 12 mois.
+Le périmètre de sauvegarde :
+— Toutes les machines virtuelles seront sauvegardées.
+— Les données de messageries seront également sauvegardées.
+— Sauvegarde des configurations d’équipements et de services.
+_________________ _________Lundi Mardi Mercredi Jeudi Vendredi
+Sauvegarde incrémentale _______X___ X____ _X______X
+Sauvegarde totale ________________________________________X
+Sauvegarde totale mensuel (vendredi)Pour le dernier vendredi du mois
+Fonctionnement :
+
+Un serveur de sauvegarde va répartir les données sauvegardées sur les NAS interne au SI ainsi qu’une copie sur l’infrastructure réservée dans le cloud public.
+
+L’accès à ce serveur se fait via des comptes administrateur locaux nominatifs, ce serveur ne sera pas inclus dans le domaine. (cf. https://cyber.gouv.fr/publications/fondamentaux-sauvegarde-systemes dinformation)
+
+Dans ce cloud public on trouvera également un serveur de supervision pour le SI de l’entreprise ainsi que le proxy de sauvegarde pour les données de supervision.
+
+8
+
+La version de sauvegarde dans le cloud public est immuable et chiffrée pour la sécuriser des cyberattaques ainsi que des fausses manipulations.
+
+Nous allons sauvegarder les configurations des équipements tous les jours de façon automatique. Les configurations seront conservées en rotation pour une durée de 30 jours.
+
+NAS
+
+Les NAS serviront pour le stockage des sauvegardes locales :
+
+Machines virtuelles
+Messagerie
+Configurations des équipements réseaux (commutateurs, bornes wifi, routeur, pare-feu…) avec les mots de passe chiffrés
+Il y en aura 2 au total, l’un dans la salle A et l’autre dans la salle B.
+
+Bastion
+
+Un bastion sera déployé pour l’utiliser en tant que point d’entrée unique pour accéder aux serveurs à administrer aussi bien en interne qu’en externe. L’objectif principal de cet outil est de tracer l’ensemble des actions administratives effectuées sur les serveurs.
+
+L’accès à ce bastion sera régulé par le filtrage des pare-feu WAN ainsi que par l’authentification.
+
+L’authentification se fera par le biais d’un identifiant, un mot de passe et un code à 6 chiffres à saisir.
+
+L’identifiant sera nominatif. Les prestataires n’auront pas la possibilité de connaître le code à 6 chiffres, ils doivent systématiquement appeler un administrateur interne pour obtenir le code à 6 chiffres, cela permet d’authentifier encore plus.
+
+Les administrateurs (prestataires & internes) ne verront seulement que les serveurs qu’ils auront le droit d’administrer.
+
+Toutes les actions seront enregistrées (en vidéo et en log) et stockées pour garder la traçabilité.
+
+L’ensemble de la procédure pour accéder aux serveurs à administrer sera transmis en annexe dans le contrat d’infogérance entre le prestataire et l’entreprise.
+
+Les comptes d’administrations des prestataires ne seront activés qu’à la demande de ceux-ci, une fois l’action terminée, le compte sera désactivé.
+
+9
+
+SIEM
+
+SIEM (Security Information and Event Management) est une solution qui centralise et analyse les journaux et évènements de sécurité générés par les différents composants d’une infrastructure informatique.
+
+Nous allons déployer un serveur SIEM sur une VM dans le VLAN IT. Des agents SIEM et/ou protocole comme syslog sont déployés sur les équipements concernés : pare-feu, routeur, commutateur, serveurs Windows, Linux pour envoyer les journaux et évènements au SIEM.
+
+Fonctionnalités principales du SIEM
+
+Centralisation des journaux et traçabilité des accès
+
+SIEM collecte, analyse et stocke les journaux et les évènements de sécurité en temps réel. Il permet d’obtenir une trace détaillée de chaque action, de fournir une visibilité sur qui accède à quoi, quand et comment.
+
+Infrastructure réseau : événements liés aux connexions, modifications de configuration, détection d’activités non autorisées, blocages, des anomalies de commutateur, routeur, pare feu, points d’accès WiFi.
+Accès VPN : journaux des connexions entrantes/sortantes, géolocalisation des utilisateurs, et alertes sur des connexions anormales.
+Bastion et systèmes d’administration : suivi des connexions des administrateurs, commandes exécutées de bastion. Suivi des sessions, des actions effectuées, des outils utilisés de poste d’administration.
+Serveurs : journaux d’authentification, modifications de permissions, tentatives échouées, etc sur des serveurs critiques AD, RDS, serveurs applicatifs, serveur de fichiers, …
+Dispositifs de sécurité : journaux des menaces détectées et actions prises des logiciels antivirus, IPS/IDS, pare-feu.
+Surveillance de la sécurité
+
+SIEM permet de surveiller de la sécurité du SI.
+
+Connexion réseaux : Détecter les anomalies comme les scans de port ou les transferts de données inhabituels.
+Changements système : Identifier les modifications non autorisées dans les configurations ou les fichiers critiques.
+Menaces externes : Détecter les tentatives d’exploitation de vulnérabilités, d’attaques DoS/DDoS.
+Utilisation des comptes utilisateurs : Détecter les connexions depuis des emplacements géographiques inhabituels ou en dehors des horaires normaux.
+10
+
+Réponse aux incidents
+
+Basé sur l’agrégation et l’analyse les données normalisées pour détecter les anomalies, les menaces et les tendances, SIEM peut déclencher des alertes et des réponses automatiques en cas d’incident. Il permet d’identifier les événements notables, leur état et leur gravité puis lancer un processus de correction et plus fournir les preuves nécessaires pour des audits.
+
+Tableaux de bord
+
+Les tableaux de bord de SIEM permettent de
+
+Afficher en temps réel les métriques critiques liées aux tentatives d’accès, événements suspects, etc.
+Suivre les indicateurs clés de performance (KPI) pour évaluer la performance et l’efficacité des mesures de sécurité.
+Faciliter la communication des informations de sécurité aux parties prenantes non techniques telles que la direction, auditeur, etc.
+Supervision
+
+La supervision d’une infrastructure informatique a pour objectif de garantir la disponibilité des services, d’optimiser les performances, de prévenir des incidents et d’assurer la sécurité du SI.
+
+Un serveur de supervision est hébergé en externe dans cloud, accessible via un domaine public. Il reste disponible même en cas de panne interne.
+
+Un serveur proxy dans un VLAN IT agit comme un intermédiaire entre les équipements internes et le serveur supervision. Il collecte les métriques des équipements locaux via des agents supervision installés sur eux ou des configurations SNMP et puis les transmet au serveur supervision. Cette solution permet de limiter l’exposition des équipements internes en maintenant des communications sécurisées avec le serveur supervision dans cloud.
+
+y a un Schéma
+
+Pour chaque élément supervisé, des seuils, des intervalles de vérification, et des seuils de tolérance 11 aux échecs ou nombre d’essais avant échec sont configurés en fonction de la criticité des ressources. Une fois une alerte déclenchée, le système envoie des notifications aux parties concernées par mail, SMS ou outils de gestion comme Teams, Slack, etc. Les éléments à superviser comprennent
+
+Matériels : État des équipements réseaux, des serveurs, disques, alimentation électrique, onduleur, températures.
+Infrastructure réseaux : Commutateur, routeur, pare-feu
+— Disponibilité des équipements, des interfaces up/down
+— Disponibilité et performance des liens WAN
+— Utilisation de bande passante
+— Etat de VPN
+Serveurs virtuels
+— Disponibilité
+— Utilisation CPU, RAM, disque
+Systèmes d’exploitation : Windows, Linux
+— Logs système critiques : erreurs, accès non autorisés, …
+— Utilisation des ressources : CPU, RAM, disques
+— Disponibilité des services critiques : AD, DNS, RDS, …
+— Approche de l’expiration d’un certificat
+Applications métiers
+— Temps de réponse
+— Disponibilité des services et/ou ports critiques
+— État des bases de données
+Messagerie
+— Disponibilité des services SMTP, IMAP, POP
+— Volume d’emails entrants et sortants
+• Sauvegardes
+— État des sauvegardes
+— Echec des jobs
+— Volume de données sauvegardées et restaurées
+Sécurité
+— Tentatives de connexions suspectes et échouées
+— Changements non autorisés dans les fichiers critiques ou configurations
+— Activité réseau inhabituelle
+Formation
+
+Chaque utilisateur est un maillon à part entière de la chaîne des systèmes d’information. À ce titre et dès son arrivée dans l’entité, il doit être informé des enjeux de sécurité, des règles à respecter et des bons comportements à adopter en matière de sécurité des systèmes d’information à travers des
+12
+
+actions de sensibilisation et de formation.
+
+Nous allons mettre en places ces actions de manière régulières et leur contenu devra être adaptées aux utilisateurs ciblés sous différentes formes (mails, affichage, réunions etc.) et aborder des sujets d’une importance capitale comme :
+
+Les objectifs et enjeux que rencontre l’entité en matière de sécurité des systèmes d’information
+Les informations considérées comme sensibles • Les réglementations et obligations légales
+Les règles et consignes de sécurité régissant l’activité quotidienne
+Les moyens disponibles et participant à la sécurité du système
+Gestion des actifs (ITAM)
+
+La gestion des actifs est un process important pour assurer la sécurité du SI. En effet, il est important de déterminer le périmètre du SI afin de pouvoir le sécuriser entièrement, l’ITAM permet d’y parvenir. Cet outil va permettre de récupérer les informations telles que les versions d’OS, charge CPU, RAM etc. et permettre de gérer les garanties des produits. En complément de l’optimisation des coûts apporté par cet outil, l’IT Asset Management va permettre de contrôler que l’ensemble du SI soit conforme aux réglementations RGPD et aux recommandations de l’ANSSI.
+
+Un serveur sera mis en place dans la zone “IT” pour récupérer l’ensemble des actifs informatiques :
+
+Hyperviseurs
+Serveurs virtuels
+Serveurs physiques
+Postes utilisateurs / administrateurs
+Equipements de sécurité (vidéosurveillance)
+Equipements réseaux
+Licences (manuel)
+Cela sera configuré afin que la découverte se fasse de façon automatique. L’objectif est de tenir la base d’actifs à jour et de savoir exactement le périmètre à sécuriser.
+
+Sécurisation et conformité
+
+Truck NORRIS, a accès à des données de santé. Cela implique une norme spécifique
+Pour sécuriser le site web on le place derrière un reverse-proxy. Le serveur qui supportera le site ainsi que le reverse-proxy seront dans une DMZ.
+13
+
+Mise en place de scan CVE sur le firewall
+Le serveur NAS qui accueillera les sauvegardes sera un serveur physique dédié et sera placé dans la salle serveur avec un VLAN dédié. Ce serveur NAS sera en RAID 5 pour sécuriser les données en cas de casse d’un des disques durs du serveur NAS.
+La téléphonie se trouve derrière un SBC qui est dans un réseau à part du réseau informatique pour une meilleure performance de la téléphonie.
+Accès des prestataires par une solution ZTNA
+Mise en place d’un SIEM pour avoir une trace écrite des actions sur le SI.
+Gestion des utilisateurs et des accès Axe d’amélioration de la gestion des utilisateurs et des accès :
+
+Concernant les contrôleurs de domaines en 2016, ceux-ci doivent êtres migrés en 2022 pour garantir un support de la part de Microsoft ainsi que les dernières mise à jour et assurer la redondance /synchro entre les deux serveurs
+Mettre en place un outil de gestion des accès privilégiés (PAM) enregistrer et superviser les actions effectuées par ces comptes et automatiser la rotation des mots de passes associés.
+Activer le MFA pour toutes les connexions VPN et appliquer une politique d’inactivité pour une déconnexion automatique après X minutes. Mettre en place une solution de Journalisation pour les sessions VPN
+Augmenter la longueur du mot de passe à 12 caractères minimum et former les utilisateurs à utiliser des mots de passes complexes. Mise en place du renouvellement des mots de passes tous les 3 mois au lieu de 6 mois. Ces changements sont à changer aussi sur la PSSI
+Mettre en place un gestionnaire de mot de passe d’entreprise pour pouvoir les stocker. Cela permet de forcer la rotation régulière des mots de passe
+Mise en place du tiering
+
+La mise en place du Tiering segmente l’infrastructure en niveaux selon les besoins de sécurité et d’accès, isolant les ressources critiques pour limiter les risques, améliorer la gouvernance et optimiser la protection des données.
+
+14
+
+Tier 0 : Infrastructure critique :
+
+Contient les systèmes les plus sensibles et stratégiques comme :
+Contrôleurs de domaine (Active Directory).
+Serveurs de gestion des identités (IAM).
+Systèmes de sauvegarde et de récupération.
+Accès extrêmement restreint, réservé aux administrateurs avec des contrôles renforcés (MFA, isolation physique et logique).
+Tier 1 : Services applicatifs sensibles :
+
+Héberge les applications essentielles à l’activité, comme :
+Applications métiers critiques (ERP, CRM).
+Bases de données.
+Accès limité aux utilisateurs autorisés avec des protections renforcées, comme des pares-feux et des journaux d’audit.
+Tier 2 : Environnement utilisateur :
+
+Inclut les postes de travail, les serveurs RDS et les ressources de collaboration.
+Accès avec des droits spécifiques aux utilisateurs finaux.
+Sécurité renforcée mais moindre que pour les niveaux supérieurs, en tenant compte des risques d’erreur humaine.
+Tier 3 : Zone publique et périphérique :
+
+Regroupe les systèmes exposés à Internet, tels que :
+Sites web publics.
+Réseaux Wi-Fi invités.
+Environnement considéré comme moins sécurisé, avec des protections rigoureuses pour éviter les intrusions (DMZ, segmentation réseau).
+AGDLP utilisateur
+
+L’intégration d’AGDLP dans notre solution permettra une gestion fine et centralisée des droits d’accès.
+
+15
+
+En structurant les groupes d’utilisateurs selon ce modèle, nous simplifierons l’attribution des permissions tout en renforçant la sécurité. Cela garantira un contrôle d’accès adapté aux besoins spécifiques de chaque ressource, tout en réduisant les risques d’erreurs ou d’accès non autorisés.
+
+Gestion des mises à jour
+
+Afin d’avoir un SI à jour en termes de fonctionnalité et de mise à jour de sécurité une solution sera mise en place afin de gérer le téléchargement et le déploiement de celles-ci.
+
+Une politique d’application devra être mise en place comme ci-dessous :
+
+— Un serveur en Front qui télécharge les mises à jour
+
+— Un serveur de mise à jour pour les autres serveurs du SI
+
+— Un serveur de mise à jour pour les postes du travail du SI
+
+— Une gestion des déploiements (ex : postes test -> jour même de la mise à jour, postes user -> J+7 de la sortie)
+
+Antispam
+
+L’antispam sera intégré à notre solution de messagerie pour bloquer les messages indésirables tels que les spams promotionnels ou malveillants. Grâce à des filtres de contenu, des listes noires et des analyses heuristiques, il garantira une communication sécurisée et réduira les risques liés aux menaces comme le phishing ou les logiciels malveillants.
+
+Hébergement par l’entreprise de son site web vitrine
+
+Migration
+
+Il est nécessaire de définir les composants du site web ainsi que les technologies utilisées. Le site web étant un CMS, il est possible de migrer toutes les données au travers de flux sécurisés pour les installer en local dans l’infrastructure (en préproduction).
+
+Nous demanderons au prestataire de Truck Norris de nous communiquer un moyen sécurisé de récupérer tous les fichiers du site web via SCP, SFTP, ou rsync. (Toutes les données du CMS ainsi que les bases de données avec des utilisateurs et comptes créer pour notre migration).
+
+16
+
+Une fois les informations communiquées par le prestataire, nous pourrons préparer le serveur qui hébergera la vitrine en y installant des services compatibles dans la version la plus récente possible.
+
+Sécurisation du site vitrine
+
+Nous allons reprendre la main sur notre domaine publique truck-norris ainsi que reprendre la gestion de notre DNS publique pour contrôler notre site web. Nous ajouterons donc sur notre web un certificat SSL qui sera basé sur le nom de domaine de truck-norris Le reverse proxy (placé en DMZ) accessible depuis internet fera la redirection vers notre site web qui ne sera pas directement exposé depuis internet.
+
+Sauvegarde du site web
+
+Ce nouveau serveur sera sauvegardé avec application de la politique de sauvegarde de la société
+
+Supervision
+
+Le nouveau serveur sera intégré à la supervision de notre infrastructure pour différentes métriques : Disque, mémoire, CPU, ping ainsi que pour des scénarios web (en effet, un succès sur la page d’accueil ne garantira pas que l’expérience utilisateur est fonctionnelle)
+
+Documentation
+
+La procédure de migration, ainsi qu’un document d’architecture et d’exploitation de la solution sera réalisé pour permettre une meilleure traçabilité et administration de la solution.
+
+Schéma
+
+y a un schéma
+
+Prise en compte RENATER
+
+l’entreprise est membre du réseau RENATER et dispense des formations dans sa structure. Afin d’isoler et de sécuriser les flux liés à ces enjeux de formations un vlan dédié aux postes de formation
+
+17
+
+sera déployé. Un serveur CAS sera mis à disposition de Compilatio afin de gérer l’authentification des utilisateurs sur le réseau RENATER. Des règles de flux et de routage seront configurées pour restreindre et n’autoriser que le réseau RENATER à communiquer avec le Vlan Formation.
+
+Ce serveur CAS sera placé derrière le Reverse-Proxy et qui fera ensuite le lien avec un RODC. Une OU particulière devra être créée pour regrouper les utilisateurs RENATER.
+
+PCA (PCI)
+
+Pour assurer la continuité de service dans le contexte de l’entreprise Truck Norris et après l’identification des équipements et serveurs essentiels nous avons mis en place plusieurs processus.
+Cela nous permettra de respecter le RTO et RPO établit par le client et de fournir un service sur mesure selon le désir et les moyens du client.
+Pour cela nous proposons de redonder tous les équipements et serveurs essentiels au bon fonctionnement du SI. Cela comprend par exemple les arrivées électrique, le Broker RDS, les serveurs RDS, les serveurs web, le SIEM, les NAS, etc.
+PRA (PRI)
+
+Solution de sauvegarde répondant à la stratégie 3,2,1,1,0. Une solution sur cloud externe. Une sauvegarde sur bande magnétique. Test des sauvegardes mensuel.
+Repartir avec les équipements de la 2nd salle serveur ou équipements encore fonctionnels sur l’ensemble du SI.
+Des tests seront effectués régulièrement pour s’assurer que les sauvegardes sont effectives au moment voulu.
+Pour une reprise efficace on a établi une liste des personnes responsable de relancer et/ou de remonter l’infrastructure du SI.
+Le PSSI est modifié en conséquence.
+Gestion des données
+
+La gestion des données consiste à collecter, ingérer, traiter, et stocker les données de l’entreprise. L’objectif est de garantir la sécurité, assurer la disponibilité, l’intégrité, la confidentialité des données.
+
+Classifier des données
+
+La classification des données permet de prioriser les efforts de sécurité, de garantir la conformité et d’optimiser ‘utilisation des ressources. Les catégories de données :
+
+Critique : Données personnelles sensibles, brevets, données financières, etc.
+18
+
+Niveau de protection très élevé : Accès restreint, chiffrement fort, MFA, journalisation des accès.
+
+Confidentiel : Données personnelles, données non personnelles et non publiques mais protégées. Par exemple : informations clients, contrats.
+Niveau de protection élevé : Contrôle d’accès strict, chiffrement.
+
+Interne : Données réservées aux employés et aux prestataires comme procédure, DAT
+Niveau de protection moyen : Control d’accès aux utilisateurs autorisés
+
+Public : Données accessibles à tous sans restriction. Par exemple : site web publique, rapport financier.
+Niveau de protection faible : Les données peuvent être partagées à grande échelle sans restriction particulières.
+
+Cycle de vie des données
+
+Gestion du cycle de vie des données désigne un flux par lequel une donnée va passer tout au long de leur existence : Collection/Création — Stockage — Traitement (Utilisation et Partage) — Analyse — Sauvegarde — Réutilisation — Suppression.
+
+À chaque étape de cycle de vie, en fonction de la classification des données, des politiques correspondantes seront élaborées.
+
+Conformité
+
+La gestion de données doit répondre à des exigences de conformité règlementaires comme RGPD, PCI DSS (Payment Card Industry Data Security Standard), CCPA (California Consumer Privacy Act aux États Unis)
+
+Confidentialité des données
+
+Garantir la confidentialité des données vise à protéger ces dernières contre tout usage abusif tout en offrant aux utilisateurs la capacité de gérer activement leurs informations.
+
+Données au repos
+
+Mettre en œuvre le chiffrement sur disques durs des postes clientes ainsi que des serveurs, bases de données.
+
+Mettre en œuvre le checksum, le hachage, la signature sur des données pour garantir qu’elles ne sont pas altérées ou corrompues.
+
+Données en transit
+
+19
+
+Utiliser protocole HTTPS avec des certificats SSL/TLS valides pour les sites web.
+
+Sécuriser les connexions VPN en utilisant IPsec pour interconnexion entre sites, vers cloud ou vers prestataire. Pour utilisateurs nomades, mettre en œuvre la solution ZTNA.
+
+Mettre en place d’une solution de chiffrement des emails :
+
+— Chiffrement au niveau du transport : utiliser protocole TLS comme outil de chiffrement STARTTLS ou STLS
+
+— Chiffrement de bout en bout (ou E2EE) : PGP (Pretty Good Privacy) ou S/MIME (Secure/Multipurpose Internet Mail Extensions)
+
+Mettre en œuvre le chiffrement SMBv3 sur tous les partages des fichiers.
+
+Sécuriser les échanges avec l’extérieur
+
+Chiffrer les données avant leur enregistrement sur un appareil physique (clé USB, disque dur portable) à transmettre à un tiers quand cela est nécessaire.
+
+Utiliser des protocoles sécurisés, versions les plus récentes pour transférer des fichiers via un réseau (ex : SCP, SFTP).
+
+Assurer la confidentialité des secrets (clé de chiffrement, mot de passe) en les transmettant via un canal distinct. Par exemple : envoi du fichier chiffré par mail et communication du mot de passe par téléphone ou SMS.
+
+Schema de infrastructure proposé
+
+Schéma physique proposé
+20
+
+y a un schéma
+
+21
+
+• Schéma logique proposé
+y a un schéma
+
+22
+
+Processus dédiés à l’administration
+
+Configuration du poste d’administration
+
+Utilisation d’un poste d’administration dédié multi-niveaux, c’est-à-dire qu’il peut à la fois accéder au SI d’administration et au SI interne où se trouvent les ressources de l’entreprise. Mise en place de politique de durcissement sur ce dernier, cela consiste à la limitation des droits aux seuls besoins d’administration et limiter la configuration du poste d’administration. L’ensemble des périphériques de stockage liés au poste d’administration seront chiffrés. Les logiciels et applications qui sont utilisés sur le poste d’administration doivent être validé en amont ainsi que leur mise à jour. De plus ils seront publiés à distance via le serveur d’application.
+
+Mise en plage de filtrage pour l’administration
+
+Les outils dédiés à l’administration seront dans un VLAN spécifique prévu à cet effet. Le bastion sera utilisé à cet effet pour l’administration des serveurs depuis la station blanche et il sera possible d’administrer les équipements réseaux depuis leur portail web.
+
+Il y aura un filtrage spécifique entre les ressources administrés et les postes d’administration. Tout sera interdit par défaut, seuls les flux spécifiques nécessaire à l’administration seront autorisés.
+
+Les communications entre le poste d’administration et les ressources d’administration seront chiffrées, notamment via l’utilisation du protocole IPsec.
+
+Un politique de filtrage réseau sur le pare-feu sera mis en place pour contrôler tous les échanges au sein du SI d’administration.
+
+De plus un filtrage plus spécifique sera mis en place entre les ressources administrées grâce au Vlan privé qui permet une micro-segmentation pour limiter les flux et ne laisser que ce qui est nécessaire à l’administration.
+
+Pour l’administration des équipements réseau, une interface réseau physique d’administration sera dédiée à cet effet. Elle sera configurée de manière limiter les échanges entre les interfaces réseaux de production et celles d’administration. De plus une interface virtuelle peut-être mis en place pour de l’administration à distance de certains équipements qui le propose.
+
+Pour la sécurisation des flux d’administration nous utiliseront des protocoles et des outils d’administrations avec des mécanismes de chiffrements et d’authentification robustes compatibles avec notre SI. Tous les protocoles non sécurisés seront désactivés ou bloqués.
+
+L’utilisation d’un bastion pour notre gestion de l’administration réponds à l’exigence de la rupture protocolaire de fait du fonctionnement de celui-ci. 23 24
